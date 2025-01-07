@@ -986,20 +986,28 @@ WaitForAllConnections(List *connectionList, bool raiseInterrupts)
 					}
 					else if (sendStatus == 0)
 					{
-						/* done writing, only wait for read events */
-						bool success =
-							CitusModifyWaitEvent(waitEventSet, event->pos,
-												 WL_SOCKET_READABLE, NULL);
-						if (!success)
+						if (connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_COMMITTING)
 						{
-							ereport(ERROR, (errcode(ERRCODE_CONNECTION_FAILURE),
-											errmsg("connection establishment for "
-												   "node %s:%d failed",
-												   connection->hostname,
-												   connection->port),
-											errhint("Check both the local and remote "
-													"server logs for the connection "
-													"establishment errors.")));
+							/* we dont wait for 2pc committing response */
+							connectionIsReady = true;
+						}
+						else
+						{
+							/* done writing, only wait for read events */
+							bool success =
+								CitusModifyWaitEvent(waitEventSet, event->pos,
+													WL_SOCKET_READABLE, NULL);
+							if (!success)
+							{
+								ereport(ERROR, (errcode(ERRCODE_CONNECTION_FAILURE),
+												errmsg("connection establishment for "
+													"node %s:%d failed",
+													connection->hostname,
+													connection->port),
+												errhint("Check both the local and remote "
+														"server logs for the connection "
+														"establishment errors.")));
+							}
 						}
 					}
 				}

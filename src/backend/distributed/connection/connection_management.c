@@ -1684,3 +1684,34 @@ CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events, Latch *latch)
 
 	return success;
 }
+
+/* compile with CFLAGS="-g -O0" */
+void
+PrintConnectionHash(void)
+{
+    HASH_SEQ_STATUS status;
+    ConnectionHashEntry *entry;
+
+	elog(NOTICE, "Connection Hash:");
+    hash_seq_init(&status, ConnectionHash);
+    while ((entry = (ConnectionHashEntry *) hash_seq_search(&status)) != NULL)
+    {
+        dlist_iter iter;
+        elog(NOTICE, "key(Hostname: %s, Port: %d, User: %s, Database: %s, Replication: %s):",
+             entry->key.hostname,
+             entry->key.port,
+             entry->key.user,
+             entry->key.database,
+             entry->key.replicationConnParam ? "true" : "false");
+        dlist_foreach(iter, entry->connections)
+        {
+            MultiConnection *connection = dlist_container(MultiConnection, connectionNode, iter.cur);
+            elog(NOTICE, "value(Connection: %lu, xact status: %d, pqstatus: %d, busy: %s, Claimed: %s)",
+				 connection->connectionId,
+                 PQtransactionStatus(connection->pgConn),
+				 PQstatus(connection->pgConn),
+				 PQisBusy(connection->pgConn) ? "true" : "false",
+                 connection->claimedExclusively ? "true" : "false");
+        }
+    }
+}

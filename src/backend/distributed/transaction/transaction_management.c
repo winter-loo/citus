@@ -1203,3 +1203,23 @@ HasAnyObjectInPropagatedObjects(List *objectList)
 
 	return false;
 }
+
+
+static void __attribute__((unused))
+PrintInProgressTransactions(void)
+{
+	dlist_iter iter;
+	fprintf(stderr, "InProgressTransactions:\n");
+	dlist_foreach(iter, &InProgressTransactions)
+	{
+		MultiConnection *connection =
+			dlist_container(MultiConnection, transactionNode, iter.cur);
+		RemoteTransaction *transaction = &connection->remoteTransaction;
+		fprintf(stderr, "Connection: %lu, remote status: %d, Status: %d, busy: %s, Failed: %d\n",
+			 connection->connectionId,
+			 transaction->transactionState,
+			 PQtransactionStatus(connection->pgConn),
+			 PQisBusy(connection->pgConn) ? "true" : "false",
+			 transaction->transactionFailed);
+	}
+}

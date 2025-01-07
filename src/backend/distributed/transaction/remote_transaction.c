@@ -578,6 +578,12 @@ FinishRemoteTransactionCommit(MultiConnection *connection)
 		   transaction->transactionState == REMOTE_TRANS_1PC_COMMITTING ||
 		   transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING);
 
+	if (transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING ||
+		transaction->transactionState == REMOTE_TRANS_2PC_ABORTING)
+	{
+		return;
+	}
+
 	PGresult *result = GetRemoteCommandResult(connection, raiseErrors);
 
 	if (!IsResponseOK(result))

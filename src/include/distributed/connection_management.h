@@ -347,4 +347,6 @@ extern bool CitusModifyWaitEvent(WaitEventSet *set, int pos, uint32 events,
 extern double MillisecondsPassedSince(instr_time moment);
 extern long MillisecondsToTimeout(instr_time start, long msAfterStart);
 
+extern void PrintConnectionHash(void);
+
 #endif /* CONNECTION_MANAGMENT_H */
