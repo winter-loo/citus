@@ -578,9 +578,9 @@ FinishRemoteTransactionCommit(MultiConnection *connection)
 		   transaction->transactionState == REMOTE_TRANS_1PC_COMMITTING ||
 		   transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING);
 
-	if (transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING ||
-		transaction->transactionState == REMOTE_TRANS_2PC_ABORTING)
+	if (Enable2PCQuickResponse && transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING)
 	{
+		/* we don't set transactionState to COMMITTED here, as ShutdownConnection() will depend on this state */
 		return;
 	}
 
@@ -1042,6 +1042,10 @@ ResetRemoteTransaction(struct MultiConnection *connection)
 	{
 		/* XXX: Should we error out for a critical transaction? */
 
+		if (Enable2PCQuickResponse && LogRemoteCommands)
+		{
+			elog(NOTICE, "ResetRemoteTransaction for connection %s:%d", connection->hostname, connection->port);
+		}
 		dlist_delete(&connection->transactionNode);
 		connection->transactionInProgress = false;
 		memset(&connection->transactionNode, 0, sizeof(connection->transactionNode));

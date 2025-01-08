@@ -788,6 +788,16 @@ AdaptiveExecutor(CitusScanState *scanState)
 	Job *job = distributedPlan->workerJob;
 	List *taskList = job->taskList;
 
+#if IN_MY_DEBUGGING_PHASE
+	{
+		if (LogRemoteCommands)
+		{
+			elog(NOTICE, "AdaptiveExecutor: taskList size: %d", list_length(taskList));
+			PrintConnectionHash();
+		}
+	}
+#endif
+
 	/* we should only call this once before the scan finished */
 	Assert(!scanState->finishedRemoteScan);
 
@@ -883,6 +893,14 @@ AdaptiveExecutor(CitusScanState *scanState)
 		RunDistributedExecution(execution);
 	}
 
+#if IN_MY_DEBUGGING_PHASE
+	if (LogRemoteCommands)
+	{
+		elog(NOTICE, "end of RunDistributedExecution in AdaptiveExecutor: taskList size: %d", list_length(taskList));
+		PrintConnectionHash();
+	}
+#endif
+
 	/* execute tasks local to the node (if any) */
 	if (list_length(execution->localTaskList) > 0)
 	{
@@ -897,6 +915,14 @@ AdaptiveExecutor(CitusScanState *scanState)
 	}
 
 	FinishDistributedExecution(execution);
+	
+#if IN_MY_DEBUGGING_PHASE
+	if (LogRemoteCommands)
+	{
+		elog(NOTICE, "end2 of RunDistributedExecution in AdaptiveExecutor: taskList size: %d", list_length(taskList));
+		PrintConnectionHash();
+	}
+#endif
 
 	if (SortReturning && distributedPlan->expectResults && commandType != CMD_SELECT)
 	{
@@ -1458,10 +1484,28 @@ AssignTasksToConnectionsOrWorkerPool(DistributedExecution *execution)
 			int connectionFlags = 0;
 			char *nodeName = NULL;
 			int nodePort = 0;
+
+#if IN_MY_DEBUGGING_PHASE
+			{
+				if (LogRemoteCommands)
+				{
+					elog(NOTICE, "before assign shardId=%ld groupId=%d nodeName=%s nodePort=%d", taskPlacement->shardId, taskPlacement->groupId, taskPlacement->nodeName, taskPlacement->nodePort);
+				}
+			}
+#endif
 			LookupTaskPlacementHostAndPort(taskPlacement, &nodeName, &nodePort);
 
 			WorkerPool *workerPool = FindOrCreateWorkerPool(execution, nodeName,
 															nodePort);
+
+#if IN_MY_DEBUGGING_PHASE
+			{
+				if (LogRemoteCommands)
+				{
+					elog(NOTICE, "after assign shardId=%ld groupId=%d nodeName=%s nodePort=%d", taskPlacement->shardId, taskPlacement->groupId, taskPlacement->nodeName, taskPlacement->nodePort);
+				}
+			}
+#endif
 
 			/*
 			 * Execution of a command on a shard placement, which may not always
@@ -1517,9 +1561,15 @@ AssignTasksToConnectionsOrWorkerPool(DistributedExecution *execution)
 				WorkerSession *session =
 					FindOrCreateWorkerSession(workerPool, connection);
 
-				ereport(DEBUG4, (errmsg("Session %ld (%s:%d) has an assigned task",
-										session->sessionId, connection->hostname,
-										connection->port)));
+#if IN_MY_DEBUGGING_PHASE
+				if (LogRemoteCommands)
+				{
+					ereport(NOTICE, (errmsg("Session %ld (%s:%d) has an assigned task shardId=%ld connectionState=%d",
+											session->sessionId, connection->hostname,
+											connection->port, session->currentTask->shardPlacement->shardId,
+											connection->connectionState)));
+				}
+#endif
 
 				placementExecution->assignedSession = session;
 
@@ -3008,6 +3058,17 @@ ConnectionStateMachine(WorkerSession *session)
 
 	do {
 		currentState = connection->connectionState;
+
+#if IN_MY_DEBUGGING_PHASE
+		{
+			if (LogRemoteCommands)
+			{
+				elog(NOTICE, "ConnectionStateMachine: connection=%lu state=%d node=%s:%d, pqstatus=%d",
+					 connection->connectionId, connection->connectionState, connection->hostname,
+					 connection->port, PQstatus(connection->pgConn));
+			}
+		}
+#endif
 
 		switch (currentState)
 		{

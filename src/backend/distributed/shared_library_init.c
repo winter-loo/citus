@@ -994,6 +994,16 @@ RegisterCitusConfigVariables(void)
 		GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE,
 		NULL, NULL, NULL);
 
+	DefineCustomBoolVariable(
+		"citus.allow_2pc_quick_response",
+		gettext_noop("Enables to not wait response for 2pc last phase(commit or abort)"),
+		NULL,
+		&Enable2PCQuickResponse,
+		false,
+		PGC_USERSET,
+		GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE,
+		NULL, NULL, NULL);
+
 	DefineCustomIntVariable(
 		"citus.background_task_queue_interval",
 		gettext_noop("Time to wait between checks for scheduled background tasks."),

@@ -38,6 +38,7 @@ int RemoteCopyFlushThreshold = 8 * 1024 * 1024;
 /* GUC, determining whether statements sent to remote nodes are logged */
 bool LogRemoteCommands = false;
 char *GrepRemoteCommands = "";
+bool Enable2PCQuickResponse = false;
 
 
 static bool ClearResultsInternal(MultiConnection *connection, bool raiseErrors,
@@ -986,7 +987,9 @@ WaitForAllConnections(List *connectionList, bool raiseInterrupts)
 					}
 					else if (sendStatus == 0)
 					{
-						if (connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_COMMITTING)
+						if (Enable2PCQuickResponse &&
+							(connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_COMMITTING ||
+							connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_ABORTING))
 						{
 							/* we dont wait for 2pc committing response */
 							connectionIsReady = true;

@@ -773,9 +773,31 @@ ShutdownConnection(MultiConnection *connection)
 	if (PQstatus(connection->pgConn) == CONNECTION_OK &&
 		PQtransactionStatus(connection->pgConn) == PQTRANS_ACTIVE)
 	{
-		SendCancelationRequest(connection);
+		RemoteTransaction* transaction = &connection->remoteTransaction;
+		if (Enable2PCQuickResponse &&
+			(transaction->transactionState == REMOTE_TRANS_2PC_ABORTING ||
+			transaction->transactionState == REMOTE_TRANS_2PC_COMMITTING))
+		{
+#if IN_MY_DEBUGGING_PHASE
+			if (LogRemoteCommands)
+			{
+				elog(NOTICE, "Not send cancel request for 2PC aborting or committing");
+			}
+#endif
+		}
+		else
+		{
+			SendCancelationRequest(connection);
+		}
 	}
 	CitusPQFinish(connection);
+#if IN_MY_DEBUGGING_PHASE
+	if (LogRemoteCommands)
+	{
+		elog(NOTICE, "connection shutdown connectionId=%ld hostname=%s port=%d",
+				connection->connectionId, connection->hostname, connection->port);
+	}
+#endif
 }
 
 
@@ -1573,6 +1595,26 @@ RemoteTransactionIdle(MultiConnection *connection)
 		return true;
 	}
 
+#if 0
+/*
+ * TODO: if we want to avoid shutting down the connection when aborting or committing 2PC
+ * distributed transactions, we need do the following:
+ * 1. in background worker, we need consume results of this connection
+ * 2. in assignning task, we should not use the this connection until the transaction is idle
+ */
+	if (Enable2PCQuickResponse &&
+		(connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_COMMITTING ||
+		connection->remoteTransaction.transactionState == REMOTE_TRANS_2PC_ABORTING))
+	{
+		/*
+		 * As RemoteTransactionIdle() is called from ShouldShutdownConnection() only, when
+		 * we are aborting or committing a 2PC distributed transaction, we keep the transaction
+		 * state by returning true to avoid shutting down the connection.
+		 */
+		return true;
+	}
+#endif
+
 	return PQtransactionStatus(connection->pgConn) == PQTRANS_IDLE;
 }
 
@@ -1697,7 +1739,7 @@ PrintConnectionHash(void)
     while ((entry = (ConnectionHashEntry *) hash_seq_search(&status)) != NULL)
     {
         dlist_iter iter;
-        elog(NOTICE, "key(Hostname: %s, Port: %d, User: %s, Database: %s, Replication: %s):",
+        elog(NOTICE, "key(Hostname=%s Port=%d User=%s Database=%s Replication=%s):",
              entry->key.hostname,
              entry->key.port,
              entry->key.user,
@@ -1706,8 +1748,9 @@ PrintConnectionHash(void)
         dlist_foreach(iter, entry->connections)
         {
             MultiConnection *connection = dlist_container(MultiConnection, connectionNode, iter.cur);
-            elog(NOTICE, "value(Connection: %lu, xact status: %d, pqstatus: %d, busy: %s, Claimed: %s)",
+            elog(NOTICE, "value(Connection=%lu connectionState=%d xactStatus=%d pqstatus=%d busy=%s Claimed=%s)",
 				 connection->connectionId,
+				 connection->connectionState,
                  PQtransactionStatus(connection->pgConn),
 				 PQstatus(connection->pgConn),
 				 PQisBusy(connection->pgConn) ? "true" : "false",

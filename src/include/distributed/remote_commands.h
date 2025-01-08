@@ -21,6 +21,7 @@
 /* GUC, determining whether statements sent to remote nodes are logged */
 extern bool LogRemoteCommands;
 extern char *GrepRemoteCommands;
+extern bool Enable2PCQuickResponse;
 
 /* GUC that determines the number of bytes after which remote COPY is flushed */
 extern int RemoteCopyFlushThreshold;
